@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <title>Starry Galaxy with Upward Confetti + Yes/No Form</title>
+  <style>
+    html, body {
+      margin: 0; 
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: white;
+      color: black;
+      min-height: 100vh;
+      width: 100vw;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      box-sizing: border-box;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    body.galaxy {
+      background: black;
+      color: white;
+    }
+    #container {
+      max-width: 800px;
+      width: 100%;
+      text-align: center;
+      user-select: none;
+    }
+    #text {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+    #form-container {
+      font-size: 2.25rem; /* 75% of 3rem */
+      margin-top: 10px;
+    }
+    button#next {
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-bottom: 20px;
+      user-select: none;
+    }
+    button#next:hover {
+      background: #0056b3;
+    }
+    /* Yes / No buttons */
+    .yn-button {
+      padding: 8px 24px;
+      font-size: 1em; /* inherit from #form-container */
+      background-color: #007bff;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      margin: 0 10px;
+      transition: background-color 0.3s ease;
+      user-select: none;
+    }
+    .yn-button:hover {
+      background-color: #0056b3;
+    }
+    /* Canvas styling */
+    canvas#stars, canvas#confetti {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      pointer-events: none;
+      z-index: 5;
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stars"></canvas>
+  <canvas id="confetti"></canvas>
+
+  <div id="container">
+    <div id="text">hey</div>
+    <button id="next">Next</button>
+
+    <!-- Form container initially hidden -->
+    <div id="form-container" style="display:none;">
+      <form id="form" action="https://formspree.io/f/mzzgyblb" method="POST">
+        <input type="hidden" name="answer" id="answer" value="" />
+        <button type="button" class="yn-button" onclick="submitAnswer('Yes')">Yes</button>
+        <button type="button" class="yn-button" onclick="submitAnswer('No')">No</button>
+      </form>
+      <div id="response" style="margin-top: 15px; font-size: 0.8em;"></div>
+    </div>
+  </div>
+
+  <script>
+    // Stars setup
+    const starsCanvas = document.getElementById('stars');
+    const starsCtx = starsCanvas.getContext('2d');
+
+    // Confetti setup
+    const confettiCanvas = document.getElementById('confetti');
+    const confettiCtx = confettiCanvas.getContext('2d');
+
+    function resizeCanvas() {
+      starsCanvas.width = window.innerWidth;
+      starsCanvas.height = window.innerHeight;
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Stars variables
+    const maxStars = 150;
+    const stars = [];
+
+    function createStars() {
+      stars.length = 0;
+      for (let i = 0; i < maxStars; i++) {
+        stars.push({
+          x: Math.random() * starsCanvas.width,
+          y: Math.random() * starsCanvas.height,
+          radius: Math.random() * 1.2 + 0.3,
+          alpha: Math.random() * 0.8 + 0.2,
+          alphaChange: (Math.random() * 0.01 + 0.001) * (Math.random() < 0.5 ? 1 : -1),
+        });
+      }
+    }
+
+    function drawStars() {
+      starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+      stars.forEach(star => {
+        star.alpha += star.alphaChange;
+        if (star.alpha <= 0.2 || star.alpha >= 1) star.alphaChange = -star.alphaChange;
+        starsCtx.beginPath();
+        starsCtx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        starsCtx.fillStyle = `rgba(255, 255, 255, ${star.alpha.toFixed(2)})`;
+        starsCtx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+        starsCtx.shadowBlur = 4;
+        starsCtx.fill();
+      });
+    }
+
+    // Confetti variables
+    const confettiParticles = [];
+    const confettiColors = [
+      '#FFC107', '#FF5722', '#4CAF50', '#2196F3', '#E91E63', '#9C27B0', '#00BCD4'
+    ];
+    let confettiDone = false;
+
+    function createConfettiBurst() {
+      confettiParticles.length = 0;
+      const centerX = confettiCanvas.width / 2;
+      const centerY = confettiCanvas.height / 2;
+
+      for (let i = 0; i < 150; i++) {
+        // Angle roughly pointing upward: from 60° to 120° (in radians)
+        const angle = (Math.random() * (120 - 60) + 60) * (Math.PI / 180);
+        const speed = Math.random() * 7 + 3;
+        confettiParticles.push({
+          x: centerX,
+          y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed, // negative because y axis downwards
+          size: Math.random() * 8 + 4,
+          color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 10,
+          gravity: 0.3,
+          opacity: 1,
+          landed: false,
+        });
+      }
+      confettiDone = false;
+    }
+
+    function drawConfetti() {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      let allLanded = true;
+
+      confettiParticles.forEach(p => {
+        if (!p.landed) allLanded = false;
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+
+        p.rotation += p.rotationSpeed;
+
+        // floor collision
+        if (p.y + p.size > confettiCanvas.height * 0.95) {
+          p.y = confettiCanvas.height * 0.95 - p.size;
+          p.vx *= 0.4;
+          p.vy = 0;
+          p.landed = true;
+        }
+
+        confettiCtx.save();
+        confettiCtx.translate(p.x, p.y);
+        confettiCtx.rotate((p.rotation * Math.PI) / 180);
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.globalAlpha = p.opacity;
+        confettiCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size / 2);
+        confettiCtx.restore();
+      });
+
+      if (allLanded) confettiDone = true;
+    }
+
+    function animateConfettiOnce() {
+      if (!confettiDone) {
+        drawConfetti();
+        requestAnimationFrame(animateConfettiOnce);
+      }
+    }
+
+    // Animate stars continuously
+    function animateStars() {
+      drawStars();
+      requestAnimationFrame(animateStars);
+    }
+
+    createStars();
+    animateStars();
+
+    // UI Logic
+    const text = document.getElementById('text');
+    const next = document.getElementById('next');
+    const body = document.body;
+    const formContainer = document.getElementById('form-container');
+    const form = document.getElementById('form');
+    const answerInput = document.getElementById('answer');
+    const responseDiv = document.getElementById('response');
+
+    let step = 0;
+
+    next.addEventListener('click', () => {
+      step++;
+      if (step === 1) {
+        text.textContent = 'so';
+      } else if (step === 2) {
+        body.classList.add('galaxy');
+        text.textContent = 'I LIKE YOU :D';
+        next.style.display = 'none';
+        createConfettiBurst();
+        animateConfettiOnce();
+
+        // Show form under the text
+        formContainer.style.display = 'block';
+      }
+    });
+
+    function submitAnswer(value) {
+      answerInput.value = value;
+
+      fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+        },
+        body: new FormData(form),
+      })
+        .then(response => {
+          if (response.ok) {
+            responseDiv.textContent = 'Thanks for your response!';
+            form.style.display = 'none';
+          } else {
+            responseDiv.textContent = 'Oops, something went wrong. Please try again.';
+          }
+        })
+        .catch(() => {
+          responseDiv.textContent = 'Oops, something went wrong. Please try again.';
+        });
+    }
+  </script>
+</body>
+</html>
